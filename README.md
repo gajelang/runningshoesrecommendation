@@ -28,11 +28,16 @@ Web aplikasi rekomendasi sepatu lari ini menggunakan Next.js App Router dengan T
 - `npm run db:push` – Mensinkronkan schema ke database.
 - `npm run db:studio` – Membuka antarmuka Drizzle Studio.
 
-## Setup Database & Drizzle
+## Setup Supabase & Drizzle
 
-- Kredensial DB dibaca dari `POSTGRES_URL`. Untuk operasi non-pooling (CLI, migrasi), gunakan `POSTGRES_URL_NON_POOLING`.
-- Jalankan `npm run db:generate` setelah memperbarui `src/db/schema.ts` untuk menghasilkan migrasi.
-- Gunakan `npm run db:push` untuk menerapkan schema ke Vercel Postgres.
+1. Buat project di [Supabase](https://supabase.com/).
+2. Dari dashboard Supabase → Project Settings → Database → Connection string (URI), salin nilai `postgresql://...` dan simpan sebagai `SUPABASE_DB_URL` di `.env.local` serta di Vercel Environment Variables.
+3. Opsional: simpan `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` jika nantinya ingin memakai Supabase Client API.
+4. Setelah koneksi siap, jalankan:
+   ```bash
+   npm run db:push
+   ```
+   untuk membuat tabel sesuai schema Drizzle.
 
 ## Next Steps (Fase Build BMAD)
 
