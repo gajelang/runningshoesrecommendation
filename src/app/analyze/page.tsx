@@ -3,35 +3,42 @@
 
 import type React from "react"
 
+import { useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Upload, ChevronRight, ChevronLeft, Check } from "lucide-react"
-import { useState, useRef } from "react"
 import { SiteFooter } from "@/components/site-footer"
+
+const INITIAL_FORM_STATE = {
+  age: "",
+  weight: "",
+  activity: "",
+  issues: "",
+  email: "",
+}
 
 export default function AnalyzePage() {
   const [step, setStep] = useState(1)
   const [image, setImage] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [uploadResult, setUploadResult] = useState<{ scanId: string; imageUrl: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Form data state
-  const [formData, setFormData] = useState({
-    age: "",
-    weight: "",
-    activity: "",
-    issues: "",
-    email: "",
-  })
+  const [formData, setFormData] = useState({ ...INITIAL_FORM_STATE })
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
+    const nextFile = e.target.files?.[0]
+    if (nextFile) {
       const reader = new FileReader()
       reader.onload = (event) => {
         setImage(event.target?.result as string)
-        setFileName(file.name)
+        setFileName(nextFile.name)
+        setFile(nextFile)
       }
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(nextFile)
     }
   }
 
@@ -43,14 +50,15 @@ export default function AnalyzePage() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const file = e.dataTransfer.files?.[0]
-    if (file) {
+    const dropped = e.dataTransfer.files?.[0]
+    if (dropped) {
       const reader = new FileReader()
       reader.onload = (event) => {
         setImage(event.target?.result as string)
-        setFileName(file.name)
+        setFileName(dropped.name)
+        setFile(dropped)
       }
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(dropped)
     }
   }
 
@@ -62,7 +70,7 @@ export default function AnalyzePage() {
     }))
   }
 
-  const isStep1Complete = image !== null
+  const isStep1Complete = file !== null
   const isStep2Complete = formData.age && formData.weight && formData.activity
   const isStep3Complete = formData.email
 
@@ -80,10 +88,43 @@ export default function AnalyzePage() {
     }
   }
 
-  const handleSubmit = () => {
-    console.log("Analysis submitted:", { image: fileName, ...formData })
-    // Redirect to results page
-    setStep(4)
+  const handleSubmit = async () => {
+    if (!file) {
+      setSubmitError("Footprint photo is required before submitting.")
+      return
+    }
+
+    setIsSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      const payload = new FormData()
+      payload.append("file", file)
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) {
+          payload.append(key, value)
+        }
+      })
+
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body: payload,
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error ?? "Failed to upload footprint. Please try again.")
+      }
+
+      const result = (await response.json()) as { scanId: string; imageUrl: string }
+      setUploadResult(result)
+      setStep(4)
+    } catch (error) {
+      console.error("Submission error", error)
+      setSubmitError(error instanceof Error ? error.message : "Unexpected error during upload.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -188,6 +229,7 @@ export default function AnalyzePage() {
                           e.stopPropagation()
                           setImage(null)
                           setFileName(null)
+                          setFile(null)
                         }}
                         className="text-xs text-primary hover:underline mt-2"
                       >
@@ -390,7 +432,7 @@ export default function AnalyzePage() {
 
               <div className="pt-6 space-y-3">
                 <Link
-                  href="/results"
+                  href={uploadResult?.scanId ? `/results?scanId=${uploadResult.scanId}` : "/results"}
                   className="block w-full px-8 py-4 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition text-center"
                 >
                   View Your Results
@@ -422,17 +464,31 @@ export default function AnalyzePage() {
               </button>
 
               <button
-                onClick={step === 3 ? handleSubmit : handleNext}
-                disabled={!canContinue}
+                onClick={() => {
+                  if (step === 3) {
+                    void handleSubmit()
+                  } else {
+                    handleNext()
+                  }
+                }}
+                disabled={
+                  !canContinue || (step === 3 && (isSubmitting || file === null))
+                }
                 className={`flex-1 px-6 py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 ${
-                  canContinue
+                  canContinue && !(step === 3 && (isSubmitting || file === null))
                     ? "bg-primary text-primary-foreground hover:opacity-90"
                     : "bg-muted text-muted-foreground cursor-not-allowed"
                 }`}
               >
-                {step === 3 ? "Submit Analysis" : "Next"}
+                {step === 3 ? (isSubmitting ? "Submitting..." : "Submit Analysis") : "Next"}
                 {step < 3 && <ChevronRight className="w-5 h-5" />}
               </button>
+            </div>
+          )}
+
+          {submitError && (
+            <div className="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {submitError}
             </div>
           )}
         </div>
