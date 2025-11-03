@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Overview
 
-## Getting Started
+Web aplikasi rekomendasi sepatu lari ini menggunakan Next.js App Router dengan Tailwind CSS serta integrasi awal Drizzle ORM ke Vercel Postgres. Dokumen PRD dan rencana BMAD tersedia di `docs/`.
 
-First, run the development server:
+## Struktur Penting
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- `src/app` – Entry Next.js App Router.
+- `src/db` – Konfigurasi Drizzle (`schema.ts`, `index.ts`).
+- `src/lib` – Utilitas lintas fitur (mis. `env.ts`).
+- `docs/` – PRD dan dokumen metodologi BMAD.
+- `drizzle.config.ts` – Konfigurasi CLI Drizzle.
+- `.env.example` – Variabel lingkungan yang diperlukan.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Menjalankan Lokally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Salin `.env.example` menjadi `.env.local` dan isi kredensial Vercel Postgres (`POSTGRES_URL`, dll) serta `OPENAI_API_KEY`.
+2. Instal dependensi (sekali saja): `npm install`.
+3. Jalankan development server: `npm run dev`.
+4. Buka `http://localhost:3000`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Perintah Tersedia
 
-## Learn More
+- `npm run dev` – Development server (Webpack).
+- `npm run build` – Build production.
+- `npm run lint` – Menjalankan ESLint.
+- `npm run db:generate` – Menghasilkan migrasi dari schema Drizzle.
+- `npm run db:push` – Mensinkronkan schema ke database.
+- `npm run db:studio` – Membuka antarmuka Drizzle Studio.
 
-To learn more about Next.js, take a look at the following resources:
+## Setup Database & Drizzle
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Kredensial DB dibaca dari `POSTGRES_URL`. Untuk operasi non-pooling (CLI, migrasi), gunakan `POSTGRES_URL_NON_POOLING`.
+- Jalankan `npm run db:generate` setelah memperbarui `src/db/schema.ts` untuk menghasilkan migrasi.
+- Gunakan `npm run db:push` untuk menerapkan schema ke Vercel Postgres.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Next Steps (Fase Build BMAD)
 
-## Deploy on Vercel
+1. Implementasi modul upload jejak kaki dan form profil.
+2. Integrasi GPT Vision via route/server action dengan manajemen prompt.
+3. Pengembangan rule engine (`src/lib/rules.ts`) dan unit testnya.
+4. Setup telemetry awal (Vercel Analytics, Sentry) dan logging custom ke tabel `events`.
+5. Menyiapkan pipeline dataset jejak kaki beserta prosedur labeling SAI/CSI.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Detail lengkap mengenai deliverables tiap fase tersedia di `docs/BMAD_Method.md`.
