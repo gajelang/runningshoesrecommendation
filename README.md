@@ -4,9 +4,10 @@ Web aplikasi rekomendasi sepatu lari ini menggunakan Next.js App Router dengan T
 
 ## Struktur Penting
 
-- `src/app` – Entry Next.js App Router.
+- `src/app` – Entry Next.js App Router + halaman hasil impor v0 (landing, analyze, result, dsb.).
+- `src/components` – Kumpulan komponen shadcn/v0 (hero sections, CTA, header/footer, UI primitives).
 - `src/db` – Konfigurasi Drizzle (`schema.ts`, `index.ts`).
-- `src/lib` – Utilitas lintas fitur (mis. `env.ts`).
+- `src/lib` – Utilitas lintas fitur (mis. `env.ts`, `utils.ts`).
 - `docs/` – PRD dan dokumen metodologi BMAD.
 - `drizzle.config.ts` – Konfigurasi CLI Drizzle.
 - `.env.example` – Variabel lingkungan yang diperlukan.
@@ -40,5 +41,11 @@ Web aplikasi rekomendasi sepatu lari ini menggunakan Next.js App Router dengan T
 3. Pengembangan rule engine (`src/lib/rules.ts`) dan unit testnya.
 4. Setup telemetry awal (Vercel Analytics, Sentry) dan logging custom ke tabel `events`.
 5. Menyiapkan pipeline dataset jejak kaki beserta prosedur labeling SAI/CSI.
+6. Sesuaikan copywriting/visual pada komponen v0 di `src/components` agar selaras dengan identitas produk.
+
+## Import Desain v0.dev
+- Desain UI diambil via `npx shadcn@latest add <v0-url>` (lihat `components.json` untuk konfigurasi).
+- Struktur Tailwind sudah disesuaikan (`tailwind.config.ts`, `src/app/globals.css`); jalankan `npm run lint` setelah menambahkan komponen baru.
+- Ikon/gambar mock berada di folder `public/`.
 
 Detail lengkap mengenai deliverables tiap fase tersedia di `docs/BMAD_Method.md`.
