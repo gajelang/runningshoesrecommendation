@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { footScans } from "@/db/schema";
+import { analyzeFootprintImage } from "@/lib/openai";
 
 export const runtime = "nodejs";
 
@@ -52,11 +54,51 @@ export async function POST(request: Request) {
 
     const record = inserted[0];
 
+    let analysisSummary: Awaited<ReturnType<typeof analyzeFootprintImage>> | null = null;
+
+    try {
+      const aiResult = await analyzeFootprintImage({
+        imageUrl: blob.url,
+        profile,
+      });
+      analysisSummary = aiResult;
+
+      await db
+        .update(footScans)
+        .set({
+          archType: aiResult.archType,
+          pronationType: aiResult.pronationType,
+          archConfidence: aiResult.archConfidence,
+          pronationConfidence: aiResult.pronationConfidence,
+          stanceWidthMm:
+            typeof aiResult.measurements?.stanceWidthMm === "number"
+              ? Math.round(aiResult.measurements.stanceWidthMm)
+              : null,
+          rawAnalysis: {
+            profile,
+            ai: aiResult,
+          },
+        })
+        .where(eq(footScans.id, record.id));
+    } catch (analysisError) {
+      console.error("[upload] GPT Vision analysis failed", analysisError);
+      await db
+        .update(footScans)
+        .set({
+          rawAnalysis: {
+            profile,
+            aiError: analysisError instanceof Error ? analysisError.message : "Unknown analysis error",
+          },
+        })
+        .where(eq(footScans.id, record.id));
+    }
+
     return NextResponse.json(
       {
         scanId: record.id,
         imageUrl: record.imageUrl,
         uploadUrl: blob.url,
+        analysis: analysisSummary,
       },
       { status: 201 },
     );
@@ -65,4 +107,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unable to process upload." }, { status: 500 });
   }
 }
-

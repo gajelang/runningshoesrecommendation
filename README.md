@@ -39,6 +39,11 @@ Web aplikasi rekomendasi sepatu lari ini menggunakan Next.js App Router dengan T
    ```
    untuk membuat tabel sesuai schema Drizzle.
 
+## OpenAI GPT Vision
+
+- Tambahkan `OPENAI_API_KEY` (dari dashboard OpenAI) ke `.env.local` dan Environment Variables Vercel.
+- Endpoint `/api/uploads` otomatis memanggil GPT Vision untuk menganalisis footprint; pastikan akun OpenAI punya akses ke model `gpt-4o-mini`.
+
 ## Next Steps (Fase Build BMAD)
 
 1. Implementasi modul upload jejak kaki dan form profil.
