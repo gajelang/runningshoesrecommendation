@@ -137,7 +137,7 @@ export default function PricingSection() {
 
                 <div className="self-stretch flex flex-col justify-start items-start gap-2">
                   <div className="flex flex-col justify-start items-start gap-1">
-                    <div className="relative h-[60px] flex items-center text-[#37322F] text-5xl font-medium leading-[60px] font-serif">
+                    <div className="relative h-[60px] flex items-center text-[#37322F] text-5xl font-medium leading-[60px] font-sans">
                       <span className="invisible">${pricing.starter[billingPeriod]}</span>
                       <span
                         className="absolute inset-0 flex items-center transition-all duration-500"
@@ -217,7 +217,7 @@ export default function PricingSection() {
 
                 <div className="self-stretch flex flex-col justify-start items-start gap-2">
                   <div className="flex flex-col justify-start items-start gap-1">
-                    <div className="relative h-[60px] flex items-center text-[#F0EFEE] text-5xl font-medium leading-[60px] font-serif">
+                    <div className="relative h-[60px] flex items-center text-[#F0EFEE] text-5xl font-medium leading-[60px] font-sans">
                       <span className="invisible">${pricing.professional[billingPeriod]}</span>
                       <span
                         className="absolute inset-0 flex items-center transition-all duration-500"
@@ -299,7 +299,7 @@ export default function PricingSection() {
 
                 <div className="self-stretch flex flex-col justify-start items-start gap-2">
                   <div className="flex flex-col justify-start items-start gap-1">
-                    <div className="relative h-[60px] flex items-center text-[#37322F] text-5xl font-medium leading-[60px] font-serif">
+                    <div className="relative h-[60px] flex items-center text-[#37322F] text-5xl font-medium leading-[60px] font-sans">
                       <span className="invisible">${pricing.enterprise[billingPeriod]}</span>
                       <span
                         className="absolute inset-0 flex items-center transition-all duration-500"
