@@ -16,14 +16,27 @@ function formatDate(value: Date | null) {
   });
 }
 
+type HistorySearchParams =
+  | {
+      email?: string | string[];
+    }
+  | Promise<{
+      email?: string | string[];
+    }>;
+
 interface HistoryPageProps {
-  searchParams?: {
-    email?: string;
-  };
+  searchParams?: HistorySearchParams;
 }
 
 export default async function HistoryPage({ searchParams }: HistoryPageProps) {
-  const requestedEmail = searchParams?.email?.trim().toLowerCase();
+  const resolved = (await Promise.resolve(searchParams)) ?? {};
+  const rawEmail = resolved.email;
+  const requestedEmail =
+    typeof rawEmail === "string"
+      ? rawEmail.trim().toLowerCase()
+      : Array.isArray(rawEmail)
+        ? rawEmail[0]?.trim().toLowerCase()
+        : undefined;
 
   let userFilterId: string | null = null;
   if (requestedEmail) {
