@@ -34,6 +34,9 @@ export const footScans = pgTable("foot_scans", {
   }),
   imageUrl: text("image_url").notNull(),
   thumbnailUrl: text("thumbnail_url"),
+  scanType: text("scan_type").default("photo"),
+  depthMapUrl: text("depth_map_url"),
+  artifactUrls: jsonb("artifact_urls"),
   archType: text("arch_type"),
   pronationType: text("pronation_type"),
   archConfidence: integer("arch_confidence"),
@@ -137,4 +140,3 @@ export const eventsRelations = relations(events, ({ one }) => ({
     references: [footScans.id],
   }),
 }));
-

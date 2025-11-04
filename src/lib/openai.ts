@@ -71,22 +71,40 @@ const jsonSchema = {
     required: ["archType", "pronationType", "archConfidence", "pronationConfidence"],
     additionalProperties: false,
   },
-  strict: true,
+  strict: false,
 } as const;
 
 export async function analyzeFootprintImage({
   imageUrl,
+  imageBase64,
+  mimeType,
   profile,
+  auxiliaryImages,
 }: {
-  imageUrl: string;
+  imageUrl?: string;
+  imageBase64?: string;
+  mimeType?: string;
   profile: FootprintProfile;
+  auxiliaryImages?: Array<{
+    imageBase64: string;
+    mimeType: string;
+    label?: string;
+  }>;
 }): Promise<FootprintAnalysis> {
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is missing.");
   }
 
-  const systemPrompt =
-    "You are a biomechanical expert specializing in footprint analysis. Classify the supplied footprint into arch type and pronation type. Respond using the required JSON schema.";
+  if (!imageUrl && !imageBase64) {
+    throw new Error("Either imageUrl or imageBase64 must be provided.");
+  }
+
+  const systemPrompt = [
+    "You are a biomechanical expert specializing in footprint analysis. Classify the supplied footprint into arch type and pronation type. Respond using the required JSON schema.",
+    "If you are uncertain, re-evaluate heel width versus arch width before finalizing.",
+    "Only output a confidence below 50 if, after re-checking, you still find the evidence inconclusive. When certain, keep confidence at or above 50.",
+    "When a depth or height-map attachment is provided, use it to cross-check midfoot elevation and medial arch height before finalizing your answer.",
+  ].join(" ");
 
   const profileDescription = [
     `Age: ${profile.age ?? "unknown"}`,
@@ -97,25 +115,54 @@ export async function analyzeFootprintImage({
 
   const response = await openaiClient.responses.create({
     model: "gpt-4o-mini",
-    response_format: { type: "json_schema", json_schema: jsonSchema },
+    text: {
+      format: {
+        type: "json_schema",
+        ...jsonSchema,
+      },
+    },
     input: [
       {
         role: "system",
         content: [{ type: "input_text", text: systemPrompt }],
       },
-      {
-        role: "user",
-        content: [
+      (() => {
+        const content: Array<{ type: "input_text"; text: string } | { type: "input_image"; image_url: string }> = [
           {
             type: "input_text",
-            text: `Analyze this footprint to determine arch type and pronation. Runner profile:\n${profileDescription}`,
+            text: `Analyze this footprint to determine arch type and pronation. Re-check midfoot and heel area as needed before final answer.\nRunner profile:\n${profileDescription}${
+              auxiliaryImages?.length
+                ? "\nAdditional attachment: top-down depth map (use to validate arch height and stance width)."
+                : ""
+            }`,
           },
-          {
-            type: "input_image",
-            image_url: imageUrl,
-          },
-        ],
-      },
+          imageUrl
+            ? { type: "input_image", image_url: imageUrl }
+            : {
+                type: "input_image",
+                image_url: `data:${mimeType ?? "image/png"};base64,${imageBase64}`,
+              },
+        ];
+
+        if (auxiliaryImages?.length) {
+          auxiliaryImages.forEach((attachment, index) => {
+            const label = attachment.label ?? `Attachment ${index + 1}`;
+            content.push({
+              type: "input_text",
+              text: `${label}: Interpret this as a height/depth visualization of the footprint. Use it to verify arch height, midfoot contact, and heel stability.`,
+            });
+            content.push({
+              type: "input_image",
+              image_url: `data:${attachment.mimeType};base64,${attachment.imageBase64}`,
+            });
+          });
+        }
+
+        return {
+          role: "user" as const,
+          content,
+        };
+      })(),
     ],
   });
 
@@ -145,4 +192,3 @@ function clamp(value: number | undefined): number {
   }
   return Math.min(100, Math.max(0, Math.round(value)));
 }
-

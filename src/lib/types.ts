@@ -41,6 +41,15 @@ export interface StoredAnalysis {
   profile?: FootprintProfile;
   ai?: FootprintAnalysis;
   plan?: RecommendationPlan;
+  depthSummary?: {
+    stats?: {
+      min?: number;
+      max?: number;
+      mean?: number;
+      width?: number;
+      height?: number;
+    };
+    notes?: string;
+  };
   [key: string]: unknown;
 }
-

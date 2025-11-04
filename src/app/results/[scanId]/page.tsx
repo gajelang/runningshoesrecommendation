@@ -9,9 +9,13 @@ import { SiteHeader } from "@/components/site-header";
 import type { RecommendationMetadata, ShoeFeatures, StoredAnalysis } from "@/lib/types";
 
 interface ResultPageProps {
-  params: {
-    scanId: string;
-  };
+  params:
+    | {
+      scanId: string;
+    }
+    | Promise<{
+        scanId: string;
+      }>;
 }
 
 function asShoeFeatures(value: unknown): ShoeFeatures {
@@ -22,8 +26,10 @@ function asShoeFeatures(value: unknown): ShoeFeatures {
 }
 
 export default async function ResultPage({ params }: ResultPageProps) {
+  const { scanId } = await Promise.resolve(params);
+
   const scan = await db.query.footScans.findFirst({
-    where: eq(footScans.id, params.scanId),
+    where: eq(footScans.id, scanId),
     with: {
       recommendations: {
         with: {
@@ -39,6 +45,7 @@ export default async function ResultPage({ params }: ResultPageProps) {
 
   const raw = (scan.rawAnalysis as StoredAnalysis) ?? {};
   const profile = raw.profile ?? {};
+  const aiError = typeof raw.aiError === "string" ? raw.aiError : null;
   const ai = raw.ai ?? {
     archType: scan.archType,
     pronationType: scan.pronationType,
@@ -46,6 +53,9 @@ export default async function ResultPage({ params }: ResultPageProps) {
     pronationConfidence: scan.pronationConfidence,
   };
   const plan = raw.plan ?? null;
+  const depthSummary = raw.depthSummary ?? null;
+  const depthStats = (depthSummary?.stats as Record<string, number | undefined>) ?? null;
+  const scanType = (scan as { scanType?: string | null }).scanType ?? (depthSummary ? "lidar" : "photo");
 
   const confidence =
     typeof scan.archConfidence === "number" && typeof scan.pronationConfidence === "number"
@@ -65,7 +75,7 @@ export default async function ResultPage({ params }: ResultPageProps) {
           </Link>
           <h1 className="mt-3 text-4xl font-bold">Your analysis results</h1>
           <p className="mt-3 text-muted-foreground">
-            Scan ID <code className="text-xs">{params.scanId}</code>
+            Scan ID <code className="text-xs">{scanId}</code>
           </p>
         </header>
 
@@ -77,6 +87,11 @@ export default async function ResultPage({ params }: ResultPageProps) {
                 Based on your uploaded footprint and profile information.
               </p>
             </div>
+            {aiError ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                Analysis failed: {aiError}. Please upload a new footprint and try again.
+              </div>
+            ) : null}
             <dl className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border border-border bg-background p-4">
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">Arch type</dt>
@@ -95,11 +110,24 @@ export default async function ResultPage({ params }: ResultPageProps) {
                 <dd className="mt-2 text-sm text-muted-foreground">
                   {[
                     profile.age ? `Age ${profile.age}` : null,
-                    profile.weight ? `Weight ${profile.weight}` : null,
+                    profile.weight ? `Weight ${profile.weight} kg` : null,
                     profile.activity ? `Activity ${profile.activity}` : null,
                   ]
                     .filter(Boolean)
                     .join(" • ") || "No extra profile info"}
+                </dd>
+              </div>
+              <div className="rounded-lg border border-border bg-background p-4">
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">Scan method</dt>
+                <dd className="mt-2 text-sm text-muted-foreground">
+                  {scanType === "lidar" ? "Photo + LiDAR depth map" : "Photo only"}
+                </dd>
+                <dd className="mt-1 text-xs text-muted-foreground">
+                  {depthStats
+                    ? `Depth intensity range (0-255): ${depthStats.min ?? 0} – ${depthStats.max ?? 0}, mean ${
+                        depthStats.mean ?? 0
+                      }`
+                    : "No depth metrics captured"}
                 </dd>
               </div>
             </dl>

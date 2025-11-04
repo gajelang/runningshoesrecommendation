@@ -23,8 +23,13 @@ export default function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [uploadResult, setUploadResult] = useState<{ scanId: string; imageUrl: string } | null>(null)
+  const [uploadResult, setUploadResult] = useState<
+    { scanId: string; imageUrl: string; scanType?: string | null; depthSummary?: unknown } | null
+  >(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const depthInputRef = useRef<HTMLInputElement>(null)
+  const [depthFile, setDepthFile] = useState<File | null>(null)
+  const [depthName, setDepthName] = useState<string | null>(null)
 
   // Form data state
   const [formData, setFormData] = useState({ ...INITIAL_FORM_STATE })
@@ -59,6 +64,14 @@ export default function AnalyzePage() {
         setFile(dropped)
       }
       reader.readAsDataURL(dropped)
+    }
+  }
+
+  const handleDepthFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextDepth = e.target.files?.[0]
+    if (nextDepth) {
+      setDepthFile(nextDepth)
+      setDepthName(nextDepth.name)
     }
   }
 
@@ -100,6 +113,9 @@ export default function AnalyzePage() {
     try {
       const payload = new FormData()
       payload.append("file", file)
+      if (depthFile) {
+        payload.append("depth", depthFile)
+      }
       Object.entries(formData).forEach(([key, value]) => {
         if (value) {
           payload.append(key, value)
@@ -116,7 +132,12 @@ export default function AnalyzePage() {
         throw new Error(data.error ?? "Failed to upload footprint. Please try again.")
       }
 
-      const result = (await response.json()) as { scanId: string; imageUrl: string }
+      const result = (await response.json()) as {
+        scanId: string
+        imageUrl: string
+        scanType?: string | null
+        depthSummary?: unknown
+      }
       setUploadResult(result)
       setStep(4)
     } catch (error) {
@@ -198,7 +219,8 @@ export default function AnalyzePage() {
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">Upload Your Footprint</h1>
                 <p className="text-muted-foreground">
-                  Choose or drag a photo of your footprint to get started with your analysis.
+                  Choose or drag a photo of your footprint to get started. If you have a LiDAR depth map, you can add it
+                  as an optional attachment for higher accuracy.
                 </p>
               </div>
 
@@ -264,6 +286,55 @@ export default function AnalyzePage() {
                   for best results. Make sure your footprint is clear, well-lit, and captures your entire sole.
                 </p>
               </div>
+
+              <div className="rounded-lg border border-border bg-muted/20 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-foreground">Attach LiDAR depth map (optional)</h3>
+                    <p className="text-sm text-muted-foreground">
+                      If you scanned your foot with an iPhone or iPad Pro, upload the exported depth map (PNG). We will
+                      fuse it with your footprint photo to enhance the analysis.
+                    </p>
+                    <p className="mt-2 text-sm">
+                      {depthName ? (
+                        <span className="text-primary">Depth file selected: {depthName}</span>
+                      ) : (
+                        <span className="text-muted-foreground">No depth map attached yet.</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-start gap-2">
+                    <input
+                      ref={depthInputRef}
+                      type="file"
+                      accept="image/png,image/heic,image/heif"
+                      onChange={handleDepthFileChange}
+                      className="hidden"
+                      aria-label="Upload depth map image"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => depthInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-secondary"
+                    >
+                      <Upload className="h-4 w-4" />
+                      Select depth map
+                    </button>
+                    {depthName ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDepthFile(null)
+                          setDepthName(null)
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Remove depth map
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -295,7 +366,7 @@ export default function AnalyzePage() {
 
                 <div>
                   <label htmlFor="weight" className="block text-sm font-medium text-foreground mb-2">
-                    Weight (lbs)
+                    Weight (kg)
                   </label>
                   <input
                     type="number"
@@ -303,7 +374,7 @@ export default function AnalyzePage() {
                     name="weight"
                     value={formData.weight}
                     onChange={handleInputChange}
-                    placeholder="Enter your weight"
+                    placeholder="Enter your weight in kilograms"
                     className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
@@ -382,9 +453,14 @@ export default function AnalyzePage() {
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p>✓ Footprint uploaded: {fileName}</p>
                   <p>✓ Age: {formData.age}</p>
-                  <p>✓ Weight: {formData.weight} lbs</p>
+                  <p>✓ Weight: {formData.weight} kg</p>
                   <p>✓ Activity Level: {formData.activity}</p>
                   {formData.issues && <p>✓ Foot Issues: {formData.issues}</p>}
+                  {depthName ? (
+                    <p>✓ Depth map: {depthName}</p>
+                  ) : (
+                    <p className="text-muted-foreground">○ No depth map provided</p>
+                  )}
                 </div>
               </div>
             </div>

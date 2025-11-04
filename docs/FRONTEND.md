@@ -39,6 +39,7 @@ Navigasi utama: logo (home), menu `Panduan`, `Analisis`. Secondary nav di footer
 - Panduan singkat + link ke `/guide`.
 - Preview gambar dengan opsi crop/rotate sederhana.
 - Validasi resolusi, ukuran, dan orientasi.
+- Input opsional depth map LiDAR (PNG) dengan status upload dan copy fallback bila tidak tersedia.
 - Progress upload (jika streaming ke storage).
 
 ### 3.4 Konfirmasi & Submit
@@ -54,6 +55,7 @@ Navigasi utama: logo (home), menu `Panduan`, `Analisis`. Secondary nav di footer
   - Tipe arch + penjelasan singkat.
   - Tipe pronasi + tips.
   - Confidence score (progress bar).
+  - Status metode scan (foto saja vs foto + LiDAR) serta ringkasan metrik depth.
 - Section rekomendasi sepatu (2–3 item):
   - Nama model, brand, kategori (Stability/Neutral/Motion Control).
   - Poin fitur penting (medial post, cushioning, drop).
@@ -130,4 +132,3 @@ Navigasi utama: logo (home), menu `Panduan`, `Analisis`. Secondary nav di footer
 - Contoh copywriting (CTA, dialog error).
 - Daftar ikon/ilustrasi yang diperlukan.
 - Template analytics event payload.
-

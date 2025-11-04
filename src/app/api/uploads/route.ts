@@ -1,7 +1,6 @@
-import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { eq, inArray } from "drizzle-orm";
+import sharp from "sharp";
 
 import { db } from "@/db";
 import { footScans, recommendations, shoeCatalog, users } from "@/db/schema";
@@ -27,6 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Footprint image file is required." }, { status: 400 });
     }
 
+    const depth = formData.get("depth");
     const userId = formData.get("userId");
     const notes = formData.get("notes");
 
@@ -38,17 +38,60 @@ export async function POST(request: Request) {
       email: formData.get("email"),
     };
 
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      console.warn("[upload] Missing BLOB_READ_WRITE_TOKEN – uploads will fail.");
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
+    const base64Image = fileBuffer.toString("base64");
+    const mimeType = file.type || "image/png";
+
+    let depthBase64: string | null = null;
+    let depthStats: {
+      min: number;
+      max: number;
+      mean: number;
+      width: number;
+      height: number;
+    } | null = null;
+
+    if (depth && depth instanceof File && depth.size > 0) {
+      try {
+        const depthArray = await depth.arrayBuffer();
+        const depthBuffer = Buffer.from(depthArray);
+        const depthImage = sharp(depthBuffer, { animated: false }).greyscale();
+        const normalized = depthImage.normalize();
+        const { data, info } = await normalized
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+
+        let min = 255;
+        let max = 0;
+        let sum = 0;
+
+        for (const value of data) {
+          const v = value as number;
+          if (v < min) min = v;
+          if (v > max) max = v;
+          sum += v;
+        }
+
+        const channels = info.channels ?? 1;
+        const pngBuffer = await sharp(data, {
+          raw: { width: info.width, height: info.height, channels },
+        })
+          .png()
+          .toBuffer();
+
+        depthBase64 = pngBuffer.toString("base64");
+        depthStats = {
+          min,
+          max,
+          mean: Number((sum / data.length).toFixed(2)),
+          width: info.width,
+          height: info.height,
+        };
+      } catch (error) {
+        console.warn("[upload] Unable to process depth map attachment", error);
+      }
     }
-
-    const safeName = file.name.replace(/\s+/g, "_");
-    const blobPath = `footprints/${randomUUID()}-${safeName}`;
-
-    const blob = await put(blobPath, file, {
-      access: "public",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-    });
 
     let resolvedUserId: string | null = null;
     const email =
@@ -81,6 +124,17 @@ export async function POST(request: Request) {
       }
     }
 
+    const depthProvided = depth instanceof File && depth.size > 0;
+    const scanType = depthProvided ? "lidar" : "photo";
+
+    const initialRawAnalysis: Record<string, unknown> = {
+      profile,
+    };
+
+    if (depthStats) {
+      initialRawAnalysis.depthSummary = { stats: depthStats };
+    }
+
     const inserted = await db
       .insert(footScans)
       .values({
@@ -88,12 +142,19 @@ export async function POST(request: Request) {
           typeof userId === "string" && userId.length > 0
             ? userId
             : resolvedUserId,
-        imageUrl: blob.url,
-        thumbnailUrl: blob.url,
+        imageUrl: "inline-upload",
+        thumbnailUrl: null,
+        scanType,
+        depthMapUrl: depthBase64 ? "inline-depth" : null,
+        artifactUrls: depthBase64 ? { depth: "inline-depth" } : null,
         notes: typeof notes === "string" && notes.length > 0 ? notes : null,
-        rawAnalysis: profile,
+        rawAnalysis: initialRawAnalysis,
       })
-      .returning({ id: footScans.id, imageUrl: footScans.imageUrl });
+      .returning({
+        id: footScans.id,
+        imageUrl: footScans.imageUrl,
+        scanType: footScans.scanType,
+      });
 
     const record = inserted[0];
 
@@ -103,8 +164,18 @@ export async function POST(request: Request) {
 
     try {
       const aiResult = await analyzeFootprintImage({
-        imageUrl: blob.url,
+        imageBase64: base64Image,
+        mimeType,
         profile,
+        auxiliaryImages: depthBase64
+          ? [
+              {
+                imageBase64: depthBase64,
+                mimeType: "image/png",
+                label: "Depth map attachment",
+              },
+            ]
+          : undefined,
       });
       analysisSummary = aiResult;
       plan = buildRecommendationPlan(aiResult, profile);
@@ -122,13 +193,22 @@ export async function POST(request: Request) {
               : null,
           rawAnalysis: {
             profile,
+            ...(depthStats
+              ? {
+                  depthSummary: {
+                    stats: depthStats,
+                    notes: "Depth map processed from LiDAR attachment.",
+                  },
+                }
+              : {}),
             ai: aiResult,
             plan,
           },
         })
         .where(eq(footScans.id, record.id));
 
-      const candidateCategories = plan.categories.map((rule) => rule.category);
+      const planCategories = plan?.categories ?? [];
+      const candidateCategories = planCategories.map((rule) => rule.category);
 
       const shoes =
         candidateCategories.length > 0
@@ -141,7 +221,7 @@ export async function POST(request: Request) {
       const ranked = shoes
         .map((shoe) => {
           const features = asShoeFeatures(shoe.features);
-          const rule = plan!.categories.find((item) => item.category === shoe.category);
+          const rule = planCategories.find((item) => item.category === shoe.category);
           let score = rule?.priority ?? 60;
           const signals: string[] = [];
 
@@ -196,14 +276,14 @@ export async function POST(request: Request) {
               shoeId: item.shoe.id,
               category: item.shoe.category,
               rationale:
-                plan!.categories.find((rule) => rule.category === item.shoe.category)?.rationale ??
+                planCategories.find((rule) => rule.category === item.shoe.category)?.rationale ??
                 "Matches your gait profile.",
-              confidenceScore: plan!.confidence,
+              confidenceScore: plan?.confidence,
               metadata: {
                 matchPercent: item.matchPercent,
                 score: item.score,
                 signals: item.signals,
-                summary: plan!.summary,
+                summary: plan?.summary,
                 shoeSnapshot: {
                   brand: item.shoe.brand,
                   model: item.shoe.model,
@@ -233,6 +313,14 @@ export async function POST(request: Request) {
         .set({
           rawAnalysis: {
             profile,
+            ...(depthStats
+              ? {
+                  depthSummary: {
+                    stats: depthStats,
+                    notes: "Depth map processed from LiDAR attachment.",
+                  },
+                }
+              : {}),
             aiError: analysisError instanceof Error ? analysisError.message : "Unknown analysis error",
           },
         })
@@ -243,7 +331,8 @@ export async function POST(request: Request) {
       {
         scanId: record.id,
         imageUrl: record.imageUrl,
-        uploadUrl: blob.url,
+        scanType: scanType,
+        depthSummary: depthStats ? { stats: depthStats } : null,
         analysis: analysisSummary,
         plan,
         recommendations: createdRecommendations,
