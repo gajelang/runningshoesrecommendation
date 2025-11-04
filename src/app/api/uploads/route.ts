@@ -4,7 +4,11 @@ import sharp from "sharp";
 
 import { db } from "@/db";
 import { footScans, recommendations, shoeCatalog, users } from "@/db/schema";
-import { analyzeFootprintImage, type FootprintAnalysis } from "@/lib/openai";
+import {
+  analyzeFootprintImage,
+  type FootprintAnalysis,
+  type FootprintProfile,
+} from "@/lib/openai";
 import { buildRecommendationPlan } from "@/lib/rules";
 import type { RecommendationMetadata, ShoeFeatures } from "@/lib/types";
 
@@ -13,6 +17,14 @@ function asShoeFeatures(value: unknown): ShoeFeatures {
     return {};
   }
   return value as ShoeFeatures;
+}
+
+function normalizeProfileValue(value: FormDataEntryValue | null): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 export const runtime = "nodejs";
@@ -30,12 +42,12 @@ export async function POST(request: Request) {
     const userId = formData.get("userId");
     const notes = formData.get("notes");
 
-    const profile = {
-      age: formData.get("age"),
-      weight: formData.get("weight"),
-      activity: formData.get("activity"),
-      issues: formData.get("issues"),
-      email: formData.get("email"),
+    const profile: FootprintProfile = {
+      age: normalizeProfileValue(formData.get("age")),
+      weight: normalizeProfileValue(formData.get("weight")),
+      activity: normalizeProfileValue(formData.get("activity")),
+      issues: normalizeProfileValue(formData.get("issues")),
+      email: normalizeProfileValue(formData.get("email")),
     };
 
     const arrayBuffer = await file.arrayBuffer();

@@ -127,7 +127,10 @@ export async function analyzeFootprintImage({
         content: [{ type: "input_text", text: systemPrompt }],
       },
       (() => {
-        const content: Array<{ type: "input_text"; text: string } | { type: "input_image"; image_url: string }> = [
+        const content: Array<
+          | { type: "input_text"; text: string }
+          | { type: "input_image"; image_url: string; detail: "low" | "high" | "auto" }
+        > = [
           {
             type: "input_text",
             text: `Analyze this footprint to determine arch type and pronation. Re-check midfoot and heel area as needed before final answer.\nRunner profile:\n${profileDescription}${
@@ -137,10 +140,11 @@ export async function analyzeFootprintImage({
             }`,
           },
           imageUrl
-            ? { type: "input_image", image_url: imageUrl }
+            ? { type: "input_image", image_url: imageUrl, detail: "auto" }
             : {
                 type: "input_image",
                 image_url: `data:${mimeType ?? "image/png"};base64,${imageBase64}`,
+                detail: "auto",
               },
         ];
 
@@ -154,6 +158,7 @@ export async function analyzeFootprintImage({
             content.push({
               type: "input_image",
               image_url: `data:${attachment.mimeType};base64,${attachment.imageBase64}`,
+              detail: "auto",
             });
           });
         }

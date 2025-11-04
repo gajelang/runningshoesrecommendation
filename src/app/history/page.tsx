@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { footScans, users } from "@/db/schema";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import type { FootprintAnalysis } from "@/lib/openai";
 import type { RecommendationMetadata, StoredAnalysis } from "@/lib/types";
 
 function formatDate(value: Date | null) {
@@ -116,7 +117,7 @@ export default async function HistoryPage({
           <div className="space-y-4">
             {scans.map((scan) => {
               const raw = (scan.rawAnalysis as StoredAnalysis) ?? {};
-              const ai = raw.ai ?? {};
+              const ai = (raw.ai as Partial<FootprintAnalysis> | undefined) ?? {};
               const profile = raw.profile ?? {};
               const topRecommendation = scan.recommendations?.[0];
               const shoe = topRecommendation?.shoe;

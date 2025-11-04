@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { footScans } from "@/db/schema";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import type { FootprintAnalysis } from "@/lib/openai";
 import type { RecommendationMetadata, ShoeFeatures, StoredAnalysis } from "@/lib/types";
 
 function asShoeFeatures(value: unknown): ShoeFeatures {
@@ -42,12 +43,7 @@ export default async function ResultPage({
   const raw = (scan.rawAnalysis as StoredAnalysis) ?? {};
   const profile = raw.profile ?? {};
   const aiError = typeof raw.aiError === "string" ? raw.aiError : null;
-  const ai = raw.ai ?? {
-    archType: scan.archType,
-    pronationType: scan.pronationType,
-    archConfidence: scan.archConfidence,
-    pronationConfidence: scan.pronationConfidence,
-  };
+  const ai = (raw.ai as Partial<FootprintAnalysis> | undefined) ?? {};
   const plan = raw.plan ?? null;
   const depthSummary = raw.depthSummary ?? null;
   const depthStats = (depthSummary?.stats as Record<string, number | undefined>) ?? null;
