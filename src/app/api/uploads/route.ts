@@ -4,7 +4,7 @@ import { put } from "@vercel/blob";
 import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { footScans, recommendations, shoeCatalog } from "@/db/schema";
+import { footScans, recommendations, shoeCatalog, users } from "@/db/schema";
 import { analyzeFootprintImage, type FootprintAnalysis } from "@/lib/openai";
 import { buildRecommendationPlan } from "@/lib/rules";
 import type { RecommendationMetadata, ShoeFeatures } from "@/lib/types";
@@ -50,10 +50,44 @@ export async function POST(request: Request) {
       token: process.env.BLOB_READ_WRITE_TOKEN,
     });
 
+    let resolvedUserId: string | null = null;
+    const email =
+      typeof profile.email === "string" && profile.email.trim().length > 0
+        ? profile.email.trim().toLowerCase()
+        : "";
+
+    if (email) {
+      const existingUser = await db.query.users.findFirst({
+        where: eq(users.email, email),
+      });
+
+      if (existingUser) {
+        resolvedUserId = existingUser.id;
+      } else {
+        const insertedUser = await db
+          .insert(users)
+          .values({ email })
+          .onConflictDoNothing({ target: users.email })
+          .returning({ id: users.id });
+
+        if (insertedUser[0]) {
+          resolvedUserId = insertedUser[0].id;
+        } else {
+          const fallback = await db.query.users.findFirst({
+            where: eq(users.email, email),
+          });
+          resolvedUserId = fallback?.id ?? null;
+        }
+      }
+    }
+
     const inserted = await db
       .insert(footScans)
       .values({
-        userId: typeof userId === "string" && userId.length > 0 ? userId : null,
+        userId:
+          typeof userId === "string" && userId.length > 0
+            ? userId
+            : resolvedUserId,
         imageUrl: blob.url,
         thumbnailUrl: blob.url,
         notes: typeof notes === "string" && notes.length > 0 ? notes : null,

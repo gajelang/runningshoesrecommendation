@@ -128,7 +128,13 @@ export default function AnalyzePage() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-background">
+    <div className="relative w-full min-h-screen bg-background">
+      {isSubmitting ? (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="mt-4 text-sm text-muted-foreground">Analyzing footprint…</p>
+        </div>
+      ) : null}
       {/* Navigation */}
       <header className="fixed top-0 w-full bg-background/80 backdrop-blur-sm border-b border-border z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">

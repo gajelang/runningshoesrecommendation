@@ -6,7 +6,6 @@ loadEnv();
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse } from "csv-parse/sync";
-import { eq } from "drizzle-orm";
 
 type RecordRow = Record<string, string>;
 

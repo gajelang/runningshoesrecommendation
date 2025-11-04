@@ -213,14 +213,29 @@ export default async function ResultPage({ params }: ResultPageProps) {
           <h3 className="text-lg font-semibold">Need adjustments?</h3>
           <p className="mt-2 text-sm text-muted-foreground">
             If you want to tweak your preferences (tempo vs long run, more stability, etc.), head back to the analysis
-            flow and update your profile. We&apos;ll learn more the more scans you perform.
+            flow and update your profile. We&apos;ll learn more from each footprint you submit.
           </p>
-          <div className="mt-4">
+          {profile.email ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Looking for previous scans? Buka{" "}
+              <Link href={`/history?email=${encodeURIComponent(profile.email)}`} className="text-primary underline">
+                halaman riwayat
+              </Link>{" "}
+              untuk melihat semua hasil dengan email tersebut.
+            </p>
+          ) : null}
+          <div className="mt-4 flex flex-wrap gap-3">
             <Link
               href="/analyze"
               className="inline-flex items-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
               Start a new analysis
+            </Link>
+            <Link
+              href="/history"
+              className="inline-flex items-center rounded-lg border border-border px-6 py-3 text-sm font-semibold text-foreground hover:bg-secondary"
+            >
+              View history
             </Link>
           </div>
         </section>
