@@ -16,15 +16,15 @@ function formatDate(value: Date | null) {
   });
 }
 
-type HistorySearchParams = Record<string, string | string[]> | undefined;
+type HistorySearchParams = Record<string, string | string[]>;
 
 export default async function HistoryPage({
   searchParams,
 }: {
-  searchParams?: Promise<HistorySearchParams> | HistorySearchParams;
+  searchParams: Promise<HistorySearchParams | undefined>;
 }) {
-  const params = await Promise.resolve(searchParams);
-  const rawEmail = params?.email;
+  const params = (await searchParams) ?? {};
+  const rawEmail = params.email;
   const requestedEmail =
     typeof rawEmail === "string"
       ? rawEmail.trim().toLowerCase()
