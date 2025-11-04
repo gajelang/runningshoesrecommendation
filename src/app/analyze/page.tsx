@@ -432,7 +432,7 @@ export default function AnalyzePage() {
 
               <div className="pt-6 space-y-3">
                 <Link
-                  href={uploadResult?.scanId ? `/results?scanId=${uploadResult.scanId}` : "/results"}
+                  href={uploadResult?.scanId ? `/results/${uploadResult.scanId}` : "/results"}
                   className="block w-full px-8 py-4 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition text-center"
                 >
                   View Your Results

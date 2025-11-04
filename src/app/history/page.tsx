@@ -1,177 +1,130 @@
-"use client"
+import Link from "next/link";
+import { desc } from "drizzle-orm";
 
-import { Trash2, Eye, Download } from "lucide-react"
-import Link from "next/link"
-import { useState } from "react"
-import { SiteFooter } from "@/components/site-footer"
+import { db } from "@/db";
+import { footScans } from "@/db/schema";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
+import type { RecommendationMetadata, StoredAnalysis } from "@/lib/types";
 
-export default function HistoryPage() {
-  const [analyses, setAnalyses] = useState([
-    {
-      id: 1,
-      date: "2025-01-15",
-      footType: "Neutral Arch",
-      pronation: "Neutral",
-      confidence: 94,
-      topShoe: "Nike Air Zoom Pegasus 40",
-      imageUrl: "/placeholder.svg?key=fflm8",
+function formatDate(value: Date | null) {
+  if (!value) return "—";
+  return value.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export default async function HistoryPage() {
+  const scans = await db.query.footScans.findMany({
+    orderBy: desc(footScans.processedAt),
+    with: {
+      recommendations: {
+        with: {
+          shoe: true,
+        },
+      },
     },
-    {
-      id: 2,
-      date: "2025-01-10",
-      footType: "Neutral Arch",
-      pronation: "Neutral",
-      confidence: 92,
-      topShoe: "Brooks Ghost 15",
-      imageUrl: "/placeholder.svg?key=a0nbh",
-    },
-    {
-      id: 3,
-      date: "2025-01-05",
-      footType: "High Arch",
-      pronation: "Underpronation",
-      confidence: 89,
-      topShoe: "ASICS Gel-Contend 7",
-      imageUrl: "/placeholder.svg?key=rml46",
-    },
-  ])
+    limit: 40,
+  });
 
-  const deleteAnalysis = (id: number) => {
-    setAnalyses(analyses.filter((a) => a.id !== id))
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-  }
+  const total = scans.length;
+  const latest = scans[0] ?? null;
+  const avgConfidence =
+    scans.length > 0
+      ? Math.round(
+          scans.reduce((sum, scan) => sum + (scan.archConfidence ?? 0), 0) / scans.length,
+        )
+      : 0;
 
   return (
-    <div className="w-full min-h-screen bg-background">
-      {/* Main Content */}
-      <div className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="mb-12">
-            <h1 className="text-4xl font-bold text-foreground mb-2">Analysis History</h1>
-            <p className="text-lg text-muted-foreground">
-              View all your past footprint analyses and track changes over time
+    <div className="bg-background text-foreground">
+      <SiteHeader />
+      <main className="mx-auto max-w-6xl px-4 pb-24 pt-28 sm:px-6 lg:px-8">
+        <header className="mb-14">
+          <h1 className="text-4xl font-bold">Analysis history</h1>
+          <p className="mt-2 text-muted-foreground">
+            Each entry below is a footprint scan processed by the AI engine. Select any row to review its
+            recommendations.
+          </p>
+        </header>
+
+        <section className="mb-12 grid gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-border bg-secondary/30 p-6">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total analyses</p>
+            <p className="mt-3 text-3xl font-semibold">{total}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-secondary/30 p-6">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Most recent</p>
+            <p className="mt-3 text-lg font-medium">{formatDate(latest?.processedAt ?? null)}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-secondary/30 p-6">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Average arch confidence</p>
+            <p className="mt-3 text-3xl font-semibold">{avgConfidence ? `${avgConfidence}%` : "—"}</p>
+          </div>
+        </section>
+
+        {scans.length === 0 ? (
+          <div className="rounded-xl border border-border bg-secondary/30 p-12 text-center">
+            <p className="text-muted-foreground">
+              Belum ada analisis. Mulai dengan{" "}
+              <Link href="/analyze" className="text-primary underline">
+                upload footprint pertama
+              </Link>
+              .
             </p>
           </div>
+        ) : (
+          <div className="space-y-4">
+            {scans.map((scan) => {
+              const raw = (scan.rawAnalysis as StoredAnalysis) ?? {};
+              const ai = raw.ai ?? {};
+              const profile = raw.profile ?? {};
+              const topRecommendation = scan.recommendations?.[0];
+              const shoe = topRecommendation?.shoe;
+              const metadata = (topRecommendation?.metadata as RecommendationMetadata) ?? {};
+              const shoeSnapshot = metadata.shoeSnapshot ?? {};
 
-          {/* Stats Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            <div className="bg-secondary rounded-lg p-6 border border-border">
-              <div className="text-sm text-muted-foreground mb-2">Total Analyses</div>
-              <div className="text-3xl font-bold text-foreground">{analyses.length}</div>
-            </div>
-
-            <div className="bg-secondary rounded-lg p-6 border border-border">
-              <div className="text-sm text-muted-foreground mb-2">Most Recent</div>
-              <div className="text-lg font-bold text-foreground">{formatDate(analyses[0].date)}</div>
-            </div>
-
-            <div className="bg-secondary rounded-lg p-6 border border-border">
-              <div className="text-sm text-muted-foreground mb-2">Avg Confidence</div>
-              <div className="text-3xl font-bold text-foreground">
-                {Math.round(analyses.reduce((a, b) => a + b.confidence, 0) / analyses.length)}%
-              </div>
-            </div>
-          </div>
-
-          {/* History Table */}
-          {analyses.length > 0 ? (
-            <div className="space-y-4">
-              {analyses.map((analysis) => (
-                <div
-                  key={analysis.id}
-                  className="bg-secondary rounded-lg border border-border hover:border-primary/50 transition-all p-4 sm:p-6"
+              return (
+                <Link
+                  key={scan.id}
+                  href={`/results/${scan.id}`}
+                  className="block rounded-xl border border-border bg-secondary/20 p-6 transition hover:border-primary/50"
                 >
-                  <div className="grid md:grid-cols-6 gap-4 items-center">
-                    {/* Image */}
-                    <div className="md:col-span-1">
-                      <div className="w-full aspect-square bg-background rounded-lg overflow-hidden">
-                        <img
-                          src={analysis.imageUrl || "/placeholder.svg"}
-                          alt="Footprint analysis"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        {formatDate(scan.processedAt)}
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold">
+                        Arch: <span className="capitalize">{ai.archType ?? scan.archType ?? "—"}</span> · Pronation:{" "}
+                        <span className="capitalize">{ai.pronationType ?? scan.pronationType ?? "—"}</span>
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {profile.email ? `Email: ${profile.email}` : "Email tidak tersedia"}
+                      </p>
                     </div>
-
-                    {/* Details */}
-                    <div className="md:col-span-3 space-y-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Analysis Date</p>
-                        <p className="font-semibold text-foreground">{formatDate(analysis.date)}</p>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Arch Type</p>
-                          <p className="text-sm font-medium text-foreground">{analysis.footType}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Pronation</p>
-                          <p className="text-sm font-medium text-foreground">{analysis.pronation}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Confidence</p>
-                          <p className="text-sm font-medium text-primary">{analysis.confidence}%</p>
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-xs text-muted-foreground">Top Recommendation</p>
-                        <p className="text-sm text-foreground">{analysis.topShoe}</p>
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="md:col-span-2 flex flex-col sm:flex-row gap-2 justify-end">
-                      <Link
-                        href="/results"
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition"
-                      >
-                        <Eye className="w-4 h-4" />
-                        <span className="hidden sm:inline">View</span>
-                      </Link>
-
-                      <button className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-secondary border border-border text-foreground rounded-lg text-sm font-medium hover:bg-muted transition">
-                        <Download className="w-4 h-4" />
-                        <span className="hidden sm:inline">Download</span>
-                      </button>
-
-                      <button
-                        onClick={() => deleteAnalysis(analysis.id)}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-secondary border border-border text-foreground rounded-lg text-sm font-medium hover:bg-muted hover:text-accent transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="hidden sm:inline">Delete</span>
-                      </button>
+                    <div className="text-sm text-muted-foreground">
+                      <p>Confidence {scan.archConfidence ?? "—"}%</p>
+                      <p>
+                        Top shoe:{" "}
+                        {shoe
+                          ? `${shoe.brand} ${shoe.model}`
+                          : shoeSnapshot.brand
+                            ? `${shoeSnapshot.brand} ${shoeSnapshot.model}`
+                            : "—"}
+                      </p>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-secondary rounded-lg border border-border p-12 text-center">
-              <p className="text-muted-foreground mb-6">No analyses yet. Start your first analysis today!</p>
-              <Link
-                href="/analyze"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition"
-              >
-                Start Analysis
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </main>
 
       <SiteFooter />
     </div>
-  )
+  );
 }

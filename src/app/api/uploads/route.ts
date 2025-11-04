@@ -1,11 +1,20 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { footScans } from "@/db/schema";
-import { analyzeFootprintImage } from "@/lib/openai";
+import { footScans, recommendations, shoeCatalog } from "@/db/schema";
+import { analyzeFootprintImage, type FootprintAnalysis } from "@/lib/openai";
+import { buildRecommendationPlan } from "@/lib/rules";
+import type { RecommendationMetadata, ShoeFeatures } from "@/lib/types";
+
+function asShoeFeatures(value: unknown): ShoeFeatures {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return value as ShoeFeatures;
+}
 
 export const runtime = "nodejs";
 
@@ -54,7 +63,9 @@ export async function POST(request: Request) {
 
     const record = inserted[0];
 
-    let analysisSummary: Awaited<ReturnType<typeof analyzeFootprintImage>> | null = null;
+    let analysisSummary: FootprintAnalysis | null = null;
+    let plan: ReturnType<typeof buildRecommendationPlan> | null = null;
+    let createdRecommendations: Array<{ id: string; category: string; matchPercent: number }> = [];
 
     try {
       const aiResult = await analyzeFootprintImage({
@@ -62,6 +73,7 @@ export async function POST(request: Request) {
         profile,
       });
       analysisSummary = aiResult;
+      plan = buildRecommendationPlan(aiResult, profile);
 
       await db
         .update(footScans)
@@ -77,9 +89,109 @@ export async function POST(request: Request) {
           rawAnalysis: {
             profile,
             ai: aiResult,
+            plan,
           },
         })
         .where(eq(footScans.id, record.id));
+
+      const candidateCategories = plan.categories.map((rule) => rule.category);
+
+      const shoes =
+        candidateCategories.length > 0
+          ? await db
+              .select()
+              .from(shoeCatalog)
+              .where(inArray(shoeCatalog.category, Array.from(new Set(candidateCategories))))
+          : await db.select().from(shoeCatalog).limit(12);
+
+      const ranked = shoes
+        .map((shoe) => {
+          const features = asShoeFeatures(shoe.features);
+          const rule = plan!.categories.find((item) => item.category === shoe.category);
+          let score = rule?.priority ?? 60;
+          const signals: string[] = [];
+
+          const pronationMatches = new Set((features.pronationSupport ?? []).map((item) => item.toLowerCase()));
+          if (pronationMatches.has(aiResult.pronationType.toLowerCase())) {
+            score += 12;
+            signals.push("pronation match");
+          }
+
+          const archMatches = new Set((features.archType ?? []).map((item) => item.toLowerCase()));
+          if (archMatches.has(aiResult.archType.toLowerCase())) {
+            score += 10;
+            signals.push("arch match");
+          }
+
+          const useCases = new Set((features.useCase ?? []).map((item) => item.toLowerCase()));
+          if (profile.activity && useCases.size > 0) {
+            if (
+              (profile.activity === "competitive" && useCases.has("tempo")) ||
+              (profile.activity === "active" && useCases.has("daily running"))
+            ) {
+              score += 6;
+              signals.push("use-case match");
+            }
+          }
+
+          const metrics = features.metrics ?? {};
+          const weight = (metrics?.weightGrams as number | null) ?? null;
+          if (weight && profile.activity === "competitive" && weight > 280) {
+            score -= 6;
+            signals.push("heavy penalty");
+          }
+
+          const matchPercent = Math.max(50, Math.min(100, Math.round(score)));
+
+          return {
+            shoe,
+            score,
+            matchPercent,
+            signals,
+          };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 4);
+
+      if (ranked.length > 0) {
+        const insertedRecommendations = await db
+          .insert(recommendations)
+          .values(
+            ranked.map((item) => ({
+              footScanId: record.id,
+              shoeId: item.shoe.id,
+              category: item.shoe.category,
+              rationale:
+                plan!.categories.find((rule) => rule.category === item.shoe.category)?.rationale ??
+                "Matches your gait profile.",
+              confidenceScore: plan!.confidence,
+              metadata: {
+                matchPercent: item.matchPercent,
+                score: item.score,
+                signals: item.signals,
+                summary: plan!.summary,
+                shoeSnapshot: {
+                  brand: item.shoe.brand,
+                  model: item.shoe.model,
+                  cushioning: item.shoe.cushioning,
+                  stability: item.shoe.stability,
+                  features: item.shoe.features,
+                  tags: item.shoe.tags,
+                },
+              } as RecommendationMetadata,
+            })),
+          )
+          .returning({
+            id: recommendations.id,
+            category: recommendations.category,
+          });
+
+        createdRecommendations = insertedRecommendations.map((item, index) => ({
+          id: item.id,
+          category: item.category,
+          matchPercent: ranked[index]?.matchPercent ?? 0,
+        }));
+      }
     } catch (analysisError) {
       console.error("[upload] GPT Vision analysis failed", analysisError);
       await db
@@ -99,6 +211,8 @@ export async function POST(request: Request) {
         imageUrl: record.imageUrl,
         uploadUrl: blob.url,
         analysis: analysisSummary,
+        plan,
+        recommendations: createdRecommendations,
       },
       { status: 201 },
     );
