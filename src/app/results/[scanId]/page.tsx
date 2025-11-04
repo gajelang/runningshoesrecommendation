@@ -8,16 +8,6 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import type { RecommendationMetadata, ShoeFeatures, StoredAnalysis } from "@/lib/types";
 
-interface ResultPageProps {
-  params:
-    | {
-      scanId: string;
-    }
-    | Promise<{
-        scanId: string;
-      }>;
-}
-
 function asShoeFeatures(value: unknown): ShoeFeatures {
   if (!value || typeof value !== "object") {
     return {};
@@ -25,8 +15,14 @@ function asShoeFeatures(value: unknown): ShoeFeatures {
   return value as ShoeFeatures;
 }
 
-export default async function ResultPage({ params }: ResultPageProps) {
-  const { scanId } = await Promise.resolve(params);
+export default async function ResultPage({
+  params,
+}: {
+  params: Promise<{
+    scanId: string;
+  }>;
+}) {
+  const { scanId } = await params;
 
   const scan = await db.query.footScans.findFirst({
     where: eq(footScans.id, scanId),
