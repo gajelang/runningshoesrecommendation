@@ -16,21 +16,15 @@ function formatDate(value: Date | null) {
   });
 }
 
-type HistorySearchParams =
-  | {
-      email?: string | string[];
-    }
-  | Promise<{
-      email?: string | string[];
-    }>;
+type HistorySearchParams = Record<string, string | string[]> | undefined;
 
-interface HistoryPageProps {
-  searchParams?: HistorySearchParams;
-}
-
-export default async function HistoryPage({ searchParams }: HistoryPageProps) {
-  const resolved = (await Promise.resolve(searchParams)) ?? {};
-  const rawEmail = resolved.email;
+export default async function HistoryPage({
+  searchParams,
+}: {
+  searchParams?: Promise<HistorySearchParams> | HistorySearchParams;
+}) {
+  const params = await Promise.resolve(searchParams);
+  const rawEmail = params?.email;
   const requestedEmail =
     typeof rawEmail === "string"
       ? rawEmail.trim().toLowerCase()
