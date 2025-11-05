@@ -265,9 +265,20 @@ export default function AnalyzePage() {
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">Upload Your Footprint</h1>
                 <p className="text-muted-foreground">
-                  Choose or drag a photo of your footprint to get started. If you have a LiDAR depth map, you can add it
-                  as an optional attachment for higher accuracy.
+                  Pilih metode untuk menyiapkan data kaki. Kamu dapat membuka kamera LiDAR untuk menangkap depth map dan
+                  mengunggah foto footprint sebagai pelengkap analisis.
                 </p>
+                <div className="mt-4 flex flex-wrap gap-3 items-center">
+                  <Link
+                    href="/scan"
+                    className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+                  >
+                    Buka Kamera LiDAR
+                  </Link>
+                  <span className="text-xs text-muted-foreground">
+                    (Safari di iPhone/iPad Pro. Depth map akan otomatis tampil di bawah jika berhasil.)
+                  </span>
+                </div>
               </div>
 
               <div
