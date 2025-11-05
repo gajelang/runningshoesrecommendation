@@ -14,6 +14,7 @@ Dokumen ini merinci kebutuhan produk khusus untuk sisi frontend aplikasi web rek
 | Landing | `/` | Penjelasan manfaat, CTA ke analisis, testimoni/pengantar ilmiah. |
 | Panduan Foto | `/guide` | Tutorial langkah demi langkah cara mengambil foto jejak kaki, contoh baik/buruk. |
 | Analisis | `/analyze` | Form multi-step (profil → unggah foto → konfirmasi); men-triger proses GPT Vision. |
+| LiDAR Capture | `/scan` | Halaman client-only untuk memulai sesi WebXR LiDAR, menangkap depth map, dan menyimpannya otomatis. |
 | Hasil Analisis | `/result/[scanId]` | Menampilkan ringkasan arch/pronasi, rekomendasi sepatu, tips tindak lanjut. |
 | Histori | `/history` (guarded) | Daftar analisis sebelumnya milik pengguna. |
 | Admin Dashboard (Future) | `/admin` | Monitoring KPI, CRUD katalog sepatu, approval manual. |
@@ -40,7 +41,14 @@ Navigasi utama: logo (home), menu `Panduan`, `Analisis`. Secondary nav di footer
 - Preview gambar dengan opsi crop/rotate sederhana.
 - Validasi resolusi, ukuran, dan orientasi.
 - Input opsional depth map LiDAR (PNG) dengan status upload dan copy fallback bila tidak tersedia.
+- Depth map auto-loaded dari LiDAR (`/scan`) melalui session storage dan ditandai di UI.
 - Progress upload (jika streaming ke storage).
+
+### 3.3a LiDAR Capture (`/scan`)
+- Client-only page (WebXR) yang memeriksa dukungan LiDAR (Safari iOS/iPadOS).
+- Menyediakan tombol `Start LiDAR Capture` → `Capture Depth Map`, menampilkan preview grayscale + metrik kedalaman.
+- Depth map disimpan ke `sessionStorage` agar halaman `/analyze` otomatis melampirkannya.
+- Fallback pesan untuk perangkat yang tidak mendukung WebXR; tautan kembali ke form manual.
 
 ### 3.4 Konfirmasi & Submit
 - Ringkasan data profil + foto sebelum submit.

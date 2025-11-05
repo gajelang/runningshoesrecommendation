@@ -3,7 +3,7 @@
 
 import type React from "react"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Upload, ChevronRight, ChevronLeft, Check } from "lucide-react"
 import { SiteFooter } from "@/components/site-footer"
@@ -30,6 +30,7 @@ export default function AnalyzePage() {
   const depthInputRef = useRef<HTMLInputElement>(null)
   const [depthFile, setDepthFile] = useState<File | null>(null)
   const [depthName, setDepthName] = useState<string | null>(null)
+  const [autoDepthLoaded, setAutoDepthLoaded] = useState(false)
 
   // Form data state
   const [formData, setFormData] = useState({ ...INITIAL_FORM_STATE })
@@ -72,8 +73,53 @@ export default function AnalyzePage() {
     if (nextDepth) {
       setDepthFile(nextDepth)
       setDepthName(nextDepth.name)
+      setAutoDepthLoaded(false)
     }
   }
+
+  useEffect(() => {
+    if (depthFile) return
+    if (typeof window === "undefined") return
+
+    const stored = window.sessionStorage.getItem("stridefit-depth-map")
+    if (!stored) return
+
+    const loadDepthFromSession = async () => {
+      try {
+        const parsed = JSON.parse(stored) as
+          | {
+              dataUrl?: string
+              metrics?: {
+                min?: number
+                max?: number
+                mean?: number
+                width?: number
+                height?: number
+              }
+            }
+          | undefined
+
+        if (!parsed?.dataUrl) {
+          return
+        }
+
+        const response = await fetch(parsed.dataUrl)
+        const depthBlob = await response.blob()
+        const filename = `lidar-depth-${Date.now()}.png`
+        const generatedFile = new File([depthBlob], filename, { type: "image/png" })
+
+        setDepthFile(generatedFile)
+        setDepthName(filename)
+        setAutoDepthLoaded(true)
+
+        window.sessionStorage.removeItem("stridefit-depth-map")
+      } catch (error) {
+        console.warn("[analyze] Unable to restore depth map from LiDAR scan.", error)
+      }
+    }
+
+    void loadDepthFromSession()
+  }, [depthFile])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -297,7 +343,9 @@ export default function AnalyzePage() {
                     </p>
                     <p className="mt-2 text-sm">
                       {depthName ? (
-                        <span className="text-primary">Depth file selected: {depthName}</span>
+                        <span className="text-primary">
+                          Depth file selected: {depthName} {autoDepthLoaded ? "(auto-loaded from LiDAR scan)" : null}
+                        </span>
                       ) : (
                         <span className="text-muted-foreground">No depth map attached yet.</span>
                       )}
@@ -456,11 +504,7 @@ export default function AnalyzePage() {
                   <p>✓ Weight: {formData.weight} kg</p>
                   <p>✓ Activity Level: {formData.activity}</p>
                   {formData.issues && <p>✓ Foot Issues: {formData.issues}</p>}
-                  {depthName ? (
-                    <p>✓ Depth map: {depthName}</p>
-                  ) : (
-                    <p className="text-muted-foreground">○ No depth map provided</p>
-                  )}
+                  {depthName ? <p>✓ Depth map: {depthName}{autoDepthLoaded ? " (from LiDAR scan)" : ""}</p> : <p className="text-muted-foreground">○ No depth map provided</p>}
                 </div>
               </div>
             </div>
