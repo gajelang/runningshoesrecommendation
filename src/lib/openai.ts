@@ -6,9 +6,11 @@ if (!apiKey) {
   console.warn("[openai] OPENAI_API_KEY is not set. Vision analysis will fail.");
 }
 
-export const openaiClient = new OpenAI({
-  apiKey,
-});
+export const openaiClient = apiKey
+  ? new OpenAI({
+      apiKey,
+    })
+  : null;
 
 export interface FootprintProfile {
   age?: string;
@@ -91,7 +93,7 @@ export async function analyzeFootprintImage({
     label?: string;
   }>;
 }): Promise<FootprintAnalysis> {
-  if (!apiKey) {
+  if (!openaiClient || !apiKey) {
     throw new Error("OPENAI_API_KEY is missing.");
   }
 
